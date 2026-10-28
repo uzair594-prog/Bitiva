@@ -12,8 +12,23 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: bitvia
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d bitvia"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/bitvia?schema=public
+      SESSION_SECRET: ci-only-test-secret-which-is-at-least-32-characters
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,7 +36,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
       - name: Install dependencies
         run: npm install
       - name: Validate Prisma schema
@@ -30,3 +44,7 @@ jobs:
         run: npm run build
       - name: TypeScript check
         run: npm run lint
+      - name: Apply disposable CI schema
+        run: npx prisma db push --accept-data-loss
+      - name: Paper-order database integration tests
+        run: npm run test:integration

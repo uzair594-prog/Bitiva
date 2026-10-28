@@ -1,0 +1,159 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String    @id @default(cuid())
+  name              String?
+  email             String?   @unique
+  emailVerified     DateTime?
+  image             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  accounts          Account[]
+  sessions          Session[]
+  paperOrders       PaperOrder[]
+  ledgerEntries     LedgerEntry[]
+  securityEvents    SecurityAuditEvent[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  @@unique([identifier, token])
+}
+
+model PaperWallet {
+  id        String   @id @default(cuid())
+  ownerKey  String   @unique
+  asset     String
+  available Decimal  @default(0) @db.Decimal(36, 18)
+  locked    Decimal  @default(0) @db.Decimal(36, 18)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  entries   LedgerEntry[]
+  @@unique([ownerKey, asset])
+  @@index([asset])
+}
+
+// Sandbox accounting only. This ledger must never represent customer deposits or withdrawable funds.
+model LedgerEntry {
+  id            String     @id @default(cuid())
+  transactionId String
+  walletId      String
+  userId        String?
+  asset         String
+  side          LedgerSide
+  amount        Decimal    @db.Decimal(36, 18)
+  memo          String
+  createdAt     DateTime   @default(now())
+  wallet        PaperWallet @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  user          User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  @@index([transactionId])
+  @@index([walletId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model PaperOrder {
+  id            String          @id @default(cuid())
+  userId        String
+  symbol        String
+  side          OrderSide
+  type          PaperOrderType
+  status        PaperOrderStatus @default(OPEN)
+  limitPrice    Decimal?         @db.Decimal(36, 18)
+  quantity      Decimal          @db.Decimal(36, 18)
+  filledQty     Decimal          @default(0) @db.Decimal(36, 18)
+  averagePrice  Decimal?         @db.Decimal(36, 18)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  cancelledAt   DateTime?
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  buyTrades     PaperTrade[]     @relation("PaperBuyOrder")
+  sellTrades    PaperTrade[]     @relation("PaperSellOrder")
+  @@index([userId, status, createdAt])
+  @@index([symbol, status, side, limitPrice])
+}
+
+model PaperTrade {
+  id            String     @id @default(cuid())
+  symbol        String
+  price         Decimal    @db.Decimal(36, 18)
+  quantity      Decimal    @db.Decimal(36, 18)
+  buyerOrderId  String
+  sellerOrderId String
+  simulatedAt   DateTime   @default(now())
+  buyerOrder    PaperOrder @relation("PaperBuyOrder", fields: [buyerOrderId], references: [id], onDelete: Restrict)
+  sellerOrder   PaperOrder @relation("PaperSellOrder", fields: [sellerOrderId], references: [id], onDelete: Restrict)
+  @@index([symbol, simulatedAt])
+}
+
+model SecurityAuditEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  eventType String
+  outcome   String
+  ipHash    String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  @@index([userId, createdAt])
+  @@index([eventType, createdAt])
+}
+
+enum LedgerSide {
+  DEBIT
+  CREDIT
+}
+
+enum OrderSide {
+  BUY
+  SELL
+}
+
+enum PaperOrderType {
+  MARKET
+  LIMIT
+}
+
+enum PaperOrderStatus {
+  OPEN
+  PARTIALLY_FILLED
+  FILLED
+  CANCELLED
+  REJECTED
+}

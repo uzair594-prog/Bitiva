@@ -58,7 +58,7 @@ model VerificationToken {
 
 model PaperWallet {
   id        String   @id @default(cuid())
-  ownerKey  String   @unique
+  ownerKey  String
   asset     String
   available Decimal  @default(0) @db.Decimal(36, 18)
   locked    Decimal  @default(0) @db.Decimal(36, 18)

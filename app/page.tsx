@@ -80,7 +80,7 @@ export default function Home() {
       if (!response.ok) throw new Error(data.error || "Could not save paper order.");
       const ordersResponse = await fetch("/api/paper/orders", { cache: "no-store" });
       const ordersData = await ordersResponse.json();
-      if (ordersResponse.ok) setPaperOrders((ordersData.orders || []).map((o: { id: string; side: string; symbol: string; type: string; quantity: string; status: string }) => ({ id: o.id, side: o.side === "BUY" ? "Buy" : "Sell", symbol: o.symbol, type: o.type === "MARKET" ? "Market" : "Limit", qty: o.quantity, status: o.status === "SIMULATED" ? "Simulated" : o.status }));
+      if (ordersResponse.ok) setPaperOrders((ordersData.orders || []).map((o: { id: string; side: string; symbol: string; type: string; quantity: string; status: string }) => ({ id: o.id, side: o.side === "BUY" ? "Buy" : "Sell", symbol: o.symbol, type: o.type === "MARKET" ? "Market" : "Limit", qty: o.quantity, status: o.status === "SIMULATED" ? "Simulated" : o.status })));
       setError("");
     } catch (e) { setError(e instanceof Error ? e.message : "Paper order could not be saved."); }
   };

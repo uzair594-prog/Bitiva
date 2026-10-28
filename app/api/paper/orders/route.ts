@@ -9,8 +9,8 @@ const schema = z.object({
   symbol: z.enum(["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "ADAUSDT"]),
   side: z.enum(["BUY", "SELL"]),
   type: z.enum(["MARKET", "LIMIT"]),
-  quantity: z.string().trim().regex(/^\\d+(?:\\.\\d{1,18})?$/).refine(v => Number(v) > 0 && Number.isFinite(Number(v)), "Quantity must be positive"),
-  limitPrice: z.string().trim().regex(/^\\d+(?:\\.\\d{1,18})?$/).optional(),
+  quantity: z.string().trim().regex(/^\d+(?:\.\d{1,18})?$/).refine(v => Number(v) > 0 && Number.isFinite(Number(v)), "Quantity must be positive"),
+  limitPrice: z.string().trim().regex(/^\d+(?:\.\d{1,18})?$/).optional(),
 }).superRefine((v, ctx) => {
   if (v.type === "LIMIT" && (!v.limitPrice || !Number.isFinite(Number(v.limitPrice)) || Number(v.limitPrice) <= 0)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["limitPrice"], message: "A positive limit price is required" });
   if (v.type === "MARKET" && v.limitPrice !== undefined) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["limitPrice"], message: "Market orders cannot include a limit price" });

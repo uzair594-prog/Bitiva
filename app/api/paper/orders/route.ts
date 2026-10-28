@@ -90,8 +90,15 @@ async function submitPersistentOrder(userId: string, input: z.infer<typeof schem
         userId: { not: userId },
         filledQty: { lt: tx.paperOrder.fields.quantity },
       },
-      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       select: orderSelect,
+    });
+    // Price-time priority: best available price first, then oldest resting order.
+    makers.sort((a, b) => {
+      const aPrice = a.limitPrice ? toScaled(a.limitPrice.toString()) : 0n;
+      const bPrice = b.limitPrice ? toScaled(b.limitPrice.toString()) : 0n;
+      if (aPrice !== bPrice) return input.side === "BUY" ? (aPrice < bPrice ? -1 : 1) : (aPrice > bPrice ? -1 : 1);
+      const time = a.createdAt.getTime() - b.createdAt.getTime();
+      return time || a.id.localeCompare(b.id);
     });
 
     for (const maker of makers) {

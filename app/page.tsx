@@ -71,11 +71,29 @@ export default function Home() {
     const mid = last || 67240.18;
     return Array.from({ length: 9 }, (_, i) => ({ ask: mid * (1 + (i + 1) * .00016), bid: mid * (1 - (i + 1) * .00016), askQty: .013 + ((i * 17) % 13) / 1000, bidQty: .011 + ((i * 11) % 15) / 1000 }));
   }, [last]);
-  const placePaperOrder = () => {
+  const placePaperOrder = async () => {
     const qty = Number(quantity), price = orderType === "Limit" ? Number(limitPrice) : last;
-    if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(price) || price <= 0) return;
-    setPaperOrders(prev => [{ id: `SIM-${Date.now().toString().slice(-7)}`, side: orderSide, symbol: selected, type: orderType, qty: quantity, status: "Simulated" }, ...prev].slice(0, 8));
+    if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(price) || price <= 0) { setError("Enter a valid positive quantity and price."); return; }
+    try {
+      const response = await fetch("/api/paper/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: selected, side: orderSide.toUpperCase(), type: orderType.toUpperCase(), quantity, ...(orderType === "Limit" ? { limitPrice } : {}) }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not save paper order.");
+      const ordersResponse = await fetch("/api/paper/orders", { cache: "no-store" });
+      const ordersData = await ordersResponse.json();
+      if (ordersResponse.ok) setPaperOrders((ordersData.orders || []).map((o: { id: string; side: string; symbol: string; type: string; quantity: string; status: string }) => ({ id: o.id, side: o.side === "BUY" ? "Buy" : "Sell", symbol: o.symbol, type: o.type === "MARKET" ? "Market" : "Limit", qty: o.quantity, status: o.status === "SIMULATED" ? "Simulated" : o.status }));
+      setError("");
+    } catch (e) { setError(e instanceof Error ? e.message : "Paper order could not be saved."); }
   };
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/paper/orders", { cache: "no-store" }).then(async response => {
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Paper order history unavailable.");
+      if (alive) setPaperOrders((data.orders || []).map((o: { id: string; side: string; symbol: string; type: string; quantity: string; status: string }) => ({ id: o.id, side: o.side === "BUY" ? "Buy" : "Sell", symbol: o.symbol, type: o.type === "MARKET" ? "Market" : "Limit", qty: o.quantity, status: o.status === "SIMULATED" ? "Simulated" : o.status })));
+    }).catch(() => { /* market overview remains usable if database persistence is not configured */ });
+    return () => { alive = false; };
+  }, []);
 
   return <main className="app-shell">
     <aside className={`sidebar ${mobileMenu ? "sidebar-open" : ""}`}><div className="brand"><div className="brand-mark"><span /></div><span>bitvia<span className="brand-dot">.</span></span><button className="mobile-close icon-button" onClick={() => setMobileMenu(false)} aria-label="Close menu"><X size={18}/></button></div><div className="workspace-label">WORKSPACE</div><nav className="nav-list"><a className="nav-item active" href="#"><LayoutDashboard size={17}/> Markets <span className="nav-active-dot"/></a><a className="nav-item" href="#trade"><Activity size={17}/> Trade terminal</a><a className="nav-item" href="#paper"><Wallet size={17}/> Paper portfolio</a><a className="nav-item" href="#research"><Compass size={17}/> Research</a></nav><div className="sidebar-bottom"><div className="upgrade-card"><div className="upgrade-icon"><Sparkles size={16}/></div><div><strong>Market intelligence</strong><p>Explore the market with clarity.</p></div><button aria-label="Explore research"><ArrowUpRight size={15}/></button></div><a className="nav-item" href="#settings"><Settings2 size={17}/> Settings</a><a className="nav-item" href="#help"><CircleHelp size={17}/> Help center</a><div className="profile"><div className="avatar">BV</div><div className="profile-copy"><strong>Guest workspace</strong><span>Sandbox mode</span></div><button className="icon-button" aria-label="Profile options"><ChevronDown size={15}/></button></div></div></aside>
